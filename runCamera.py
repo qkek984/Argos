@@ -4,10 +4,10 @@ import cv2
 import time
 import threading
 from lib import sha256
-from server import client
-global savecam
+from lib import client
+global Camera
 
-class saveCam:
+class Camera:
     def __init__(self):
         self.size=(320,240)
         #pi camera
@@ -21,7 +21,7 @@ class saveCam:
         self.out=None
 
     def updateFileName(self,fileName):
-        self.out = cv2.VideoWriter('file/'+fileName+'.avi',self.fourcc, 20.0, self.size)
+        self.out = cv2.VideoWriter('localRepository/'+fileName+'.avi',self.fourcc, 20.0, self.size)
         
     def save(self):
         # Define the codec and create VideoWriter object
@@ -39,32 +39,35 @@ class saveCam:
         out.release()
         cv.destroyAllWindows()
 
-class checkTime(threading.Thread):
-    def __init__(self):
+class connectServer(threading.Thread):
+    def __init__(self,addr,savePeriod):
         threading.Thread.__init__(self)
-        self.addr = 'http://localhost:5001'
+        self.addr = addr
+        self.savePeriod= savePeriod
     def run(self):
-        global savecam
-        #init
-        fileName=time.strftime("%y%m%d_%H:%M:%S",time.localtime())
-        fileName=sha256.encrypt_string(fileName)
-        savecam.updateFileName(str(fileName))
-
-        #request foward to server
-        client.requestMessage(self.addr, str(fileName))
-
+        global camera
+        first=True
         while True:
-            time.sleep(300)# 5분간 슬립
+            if first == False:
+                preFileName=fileName
+            
             fileName=time.strftime("%y%m%d_%H:%M:%S",time.localtime())
             fileName=sha256.encrypt_string(fileName)
-            savecam.updateFileName(str(fileName))
-            client.requestMessage(self.addr, str(fileName))
+            camera.updateFileName(str(fileName))
+            if first==True:
+                first=False
+                time.sleep(self.savePeriod)
+                continue
             
+            client.requestMessage(self.addr, str(preFileName))#request foward to server
+            file = {'file':open('localRepository/'+preFileName+'.avi','rb')}
+            client.requestUpload(self.addr, file)#request foward to server
+            time.sleep(self.savePeriod)
+
 
 if __name__=='__main__':
-    timeTread=checkTime()
-    savecam=saveCam()
-    timeTread.start()
-    savecam.save()
+    cServer=connectServer(addr='http://localhost:5001',savePeriod=10)
+    camera=Camera()
     
-    
+    cServer.start()
+    camera.save()
