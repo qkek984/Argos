@@ -1,0 +1,9 @@
+opencv-python
+numpy
+imutils
+scipy
+flask
+dlib
+json
+werkzeug
+hashlib
